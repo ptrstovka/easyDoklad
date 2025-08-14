@@ -21,6 +21,8 @@ export type AppPageProps<T extends Record<string, unknown> = Record<string, unkn
   sidebarOpen: boolean
 };
 
+export type Feature = 'expenses'
+
 export interface User {
   name: string
   email: string
@@ -31,6 +33,7 @@ export interface User {
     name: string
     current: boolean
   }>
+  features: Record<Feature, boolean>
 }
 
 export type BreadcrumbItemType = BreadcrumbItem

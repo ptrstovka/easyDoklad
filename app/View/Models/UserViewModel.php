@@ -29,6 +29,7 @@ class UserViewModel extends ViewModel
                 'name' => $account->company->business_name,
                 'current' => $account->is($currentAccount),
             ]),
+            'features' => (object) $this->user->features()->all(),
         ];
     }
 }

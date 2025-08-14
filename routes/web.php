@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Expenses\ExpenseController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\Invoice\DownloadInvoiceController;
 use App\Http\Controllers\Invoice\DuplicateController;
@@ -14,6 +15,7 @@ use App\Http\Controllers\Invoice\SerializeInvoiceController;
 use App\Http\Controllers\SwitchAccountController;
 use App\Http\Controllers\TemporaryUploadController;
 use Illuminate\Support\Facades\Route;
+use Laravel\Pennant\Middleware\EnsureFeaturesAreActive;
 
 Route::get('/', HomeController::class)->name('home');
 
@@ -40,6 +42,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/invoices/{invoice:uuid}/duplicate', DuplicateController::class)->name('invoices.duplicate');
 
     Route::post('/files', [TemporaryUploadController::class, 'store'])->name('files.store');
+
+    Route::prefix('/expenses')
+        ->group(function () {
+            Route::get('/', [ExpenseController::class, 'index'])->name('expenses');
+        })
+        ->middleware(EnsureFeaturesAreActive::using('expenses'));
 });
 
 require __DIR__.'/settings.php';

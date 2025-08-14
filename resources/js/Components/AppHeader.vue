@@ -116,7 +116,7 @@ import UserMenuContent from '@/Components/UserMenuContent.vue'
 import type { BreadcrumbItem } from '@/Types'
 import { Link, usePage } from '@inertiajs/vue3'
 import { useNavigation, NavigationButton, NavigationButtonIcon } from "@stacktrace/ui";
-import { MenuIcon, LayoutGridIcon, ChevronDownIcon, FileTextIcon } from 'lucide-vue-next'
+import { MenuIcon, LayoutGridIcon, ChevronDownIcon, FileTextIcon, BanknoteArrowDownIcon, BanknoteArrowUpIcon } from 'lucide-vue-next'
 import { computed } from 'vue'
 import { DevPreview } from '@/Components/FeatureFlags'
 
@@ -133,17 +133,32 @@ const auth = computed(() => page.props.auth)
 
 const account = computed(() => page.props.auth.user.accounts.find(it => it.current)!)
 
-const navigation = useNavigation([
-  {
-    title: 'Prehľad',
-    action: { route: 'dashboard' },
-    icon: LayoutGridIcon,
-  },
-  {
-    title: 'Vystavené faktúry',
-    action: { route: 'invoices' },
-    active: { route: 'invoices*' },
-    icon: FileTextIcon,
-  },
-])
+const navigation = useNavigation(computed(() => {
+  const hasExpensesFeature = auth.value.user.features.expenses
+
+  const menu = [
+    {
+      title: 'Prehľad',
+      action: { route: 'dashboard' },
+      icon: LayoutGridIcon,
+    },
+    {
+      title: hasExpensesFeature ? 'Príjmy' : 'Vystavené faktúry',
+      action: { route: 'invoices' },
+      active: { route: 'invoices*' },
+      icon: hasExpensesFeature ? BanknoteArrowUpIcon : FileTextIcon,
+    },
+  ]
+
+  if (hasExpensesFeature) {
+    menu.push({
+      title: 'Náklady',
+      action: { route: 'expenses' },
+      active: { route: 'expenses*' },
+      icon: BanknoteArrowDownIcon,
+    })
+  }
+
+  return menu
+}))
 </script>
