@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Casts\AsMoney;
 use App\Enums\PaymentMethod;
+use App\Events\InvoicePaid;
 use App\Mail\SendInvoiceMail;
 use App\Models\Concerns\HasUuid;
 use App\Support\MoneyUtils;
@@ -17,13 +18,19 @@ use Brick\Money\Exception\MoneyMismatchException;
 use Brick\Money\Money;
 use Bysqr\BankAccount;
 use Bysqr\Pay;
-use Bysqr\Payment;
+use Bysqr\Payment as PendingPayment;
 use Bysqr\PaymentOption;
+use Carbon\Carbon;
+use Closure;
+use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -61,6 +68,7 @@ use RuntimeException;
  * @property int $invoice_number
  * @property Money|null $total_vat_inclusive
  * @property Money|null $total_vat_exclusive
+ * @property \Illuminate\Database\Eloquent\Collection<int, \App\Models\Payment> $payments
  */
 class Invoice extends Model
 {
@@ -91,6 +99,7 @@ class Invoice extends Model
     {
         static::deleting(function (Invoice $invoice) {
             $invoice->lines->each->delete();
+            $invoice->payments->each->delete();
         });
 
         static::deleted(function (Invoice $invoice) {
@@ -137,6 +146,11 @@ class Invoice extends Model
     public function template(): BelongsTo
     {
         return $this->belongsTo(DocumentTemplate::class);
+    }
+
+    public function payments(): MorphMany
+    {
+        return $this->morphMany(Payment::class, 'payable');
     }
 
     /**
@@ -321,6 +335,20 @@ class Invoice extends Model
     }
 
     /**
+     * Get amount which is remaining to be paid.
+     */
+    public function getRemainingAmountToPay(): ?Money
+    {
+        if ($amount = $this->getAmountToPay()) {
+            $paid = MoneyUtils::sum($this->currency, ...$this->payments->map->amount);
+
+            return Money::max(Money::zero($this->currency), $amount->minus($paid));
+        }
+
+        return null;
+    }
+
+    /**
      * Get a Pay By Square Pay configuration.
      */
     public function getPayBySquare(): ?Pay
@@ -328,7 +356,7 @@ class Invoice extends Model
         if (($amount = $this->getAmountToPay()) && ($iban = $this->supplier->bank_account_iban)) {
             return new Pay(
                 payments: [
-                    new Payment(
+                    new PendingPayment(
                         paymentOptions: PaymentOption::PAYMENT_ORDER,
                         amount: $amount->getAmount()->toFloat(),
                         currencyCode: $amount->getCurrency()->getCurrencyCode(),
@@ -452,5 +480,53 @@ class Invoice extends Model
         }
 
         return $invoice;
+    }
+
+    /**
+     * Execute given callback while locking the invoice.
+     *
+     * @template TReturn
+     *
+     * @param (callable(\App\Models\Invoice): (TReturn)) $callback
+     * @param int $for
+     * @param int $block
+     *
+     * @return TReturn
+     *
+     * @throws \Illuminate\Contracts\Cache\LockTimeoutException
+     */
+    public function whileLocked(callable $callback, int $for = 10, int $block = 5)
+    {
+        return Cache::lock('Invoice'.$this->id, $for)->block($block, fn () => $callback($this));
+    }
+
+    /**
+     * Add a payment to the invoice.
+     */
+    public function addPayment(Money $amount, PaymentMethod $method, Carbon $receivedAt, ?User $recordedBy = null): Payment
+    {
+        /** @var \App\Models\Payment $payment */
+        $payment = $this->payments()->make([
+            'amount' => $amount,
+            'method' => $method,
+            'received_at' => $receivedAt,
+        ]);
+        $payment->recordedBy()->associate($recordedBy);
+
+        $payment->save();
+
+        $this->load('payments');
+
+        $paidAmount = MoneyUtils::sum($this->currency, ...$this->payments->map->amount);
+
+        $toPay = $this->getAmountToPay();
+
+        if ($paidAmount->isGreaterThanOrEqualTo($toPay) && !$this->paid) {
+            $this->update(['paid' => true]);
+
+            event(new InvoicePaid($this->withoutRelations()));
+        }
+
+        return $payment;
     }
 }

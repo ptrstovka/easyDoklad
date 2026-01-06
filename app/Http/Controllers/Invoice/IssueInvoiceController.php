@@ -23,7 +23,7 @@ class IssueInvoiceController
                 ->block(5, fn () => DB::transaction(fn () => $invoice->issue()));
         } catch (LockTimeoutException) {
             return throw ValidationException::withMessages([
-                'public_invoice_number' => 'Nepodarilo sa očíslovať faktúru. Skúste to znovu.'
+                'public_invoice_number' => 'Nepodarilo sa vystaviť faktúru. Skúste to znovu.'
             ]);
         }
 

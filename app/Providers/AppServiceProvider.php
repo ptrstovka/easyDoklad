@@ -6,6 +6,7 @@ use App\Facades\Accounts;
 use App\Models\User;
 use App\Services\AccountService;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -17,6 +18,10 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->scoped(AccountService::class);
         $this->app->alias(AccountService::class, 'accounts');
+
+        Relation::enforceMorphMap([
+            'invoice' => \App\Models\Invoice::class,
+        ]);
     }
 
     public function boot(): void

@@ -116,6 +116,7 @@ class InvoiceController
             ]),
             'totalVatInclusive' => $invoice->total_vat_inclusive?->getMinorAmount(),
             'totalVatExclusive' => $invoice->total_vat_exclusive?->getMinorAmount(),
+            'remainingToPay' => $invoice->getRemainingAmountToPay()?->getMinorAmount(),
 
             'countries' => Country::options(),
             'paymentMethods' => PaymentMethod::options(),

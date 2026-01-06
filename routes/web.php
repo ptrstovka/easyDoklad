@@ -9,6 +9,7 @@ use App\Http\Controllers\Invoice\InvoiceController;
 use App\Http\Controllers\Invoice\InvoiceLockController;
 use App\Http\Controllers\Invoice\IssueInvoiceController;
 use App\Http\Controllers\Invoice\PaidFlagController;
+use App\Http\Controllers\Invoice\PaymentController;
 use App\Http\Controllers\Invoice\SendController;
 use App\Http\Controllers\Invoice\SentFlagController;
 use App\Http\Controllers\Invoice\SerializeInvoiceController;
@@ -36,10 +37,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/invoices/{invoice:uuid}/download', DownloadInvoiceController::class)->name('invoices.download');
     Route::post('/invoices/{invoice:uuid}/flags/sent', [SentFlagController::class, 'store'])->name('invoices.sent-flag.store');
     Route::delete('/invoices/{invoice:uuid}/flags/sent', [SentFlagController::class, 'destroy'])->name('invoices.sent-flag.destroy');
-    Route::post('/invoices/{invoice:uuid}/flags/paid', [PaidFlagController::class, 'store'])->name('invoices.paid-flag.store');
-    Route::delete('/invoices/{invoice:uuid}/flags/paid', [PaidFlagController::class, 'destroy'])->name('invoices.paid-flag.destroy');
     Route::post('/invoices/{invoice:uuid}/send', SendController::class)->name('invoices.send')->middleware('throttle:mail');
     Route::post('/invoices/{invoice:uuid}/duplicate', DuplicateController::class)->name('invoices.duplicate');
+    Route::post('/invoices/{invoice:uuid}/payments', [PaymentController::class, 'store'])->name('invoices.payments.store');
 
     Route::post('/files', [TemporaryUploadController::class, 'store'])->name('files.store');
 

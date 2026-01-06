@@ -153,8 +153,8 @@ class InvoiceTable extends Table
             MarkInvoiceAsSentAction::make()
                 ->can(fn (Invoice $invoice) => Gate::allows('update', $invoice) && !$invoice->draft && !$invoice->sent),
 
-            MarkInvoiceAsPaidAction::make()
-                ->can(fn (Invoice $invoice) => Gate::allows('update', $invoice) && !$invoice->draft && !$invoice->paid),
+            // MarkInvoiceAsPaidAction::make()
+            //     ->can(fn (Invoice $invoice) => Gate::allows('update', $invoice) && !$invoice->draft && !$invoice->paid),
 
             DuplicateInvoiceAction::make()
                 ->can(fn (Invoice $invoice) => Gate::allows('view', $invoice) && !$invoice->draft),
