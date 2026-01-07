@@ -16,7 +16,7 @@ class InvoiceLockController
         abort_if($invoice->draft, 400, "Invoice draft cannot be locked");
         abort_if($invoice->locked, 400, "Locked invoice cannot be locked");
 
-        $invoice->lock();
+        $invoice->preventModifications();
 
         return back();
     }
@@ -27,7 +27,7 @@ class InvoiceLockController
 
         abort_unless($invoice->locked, 400, "Already unlocked invoice cannot be unlocked");
 
-        $invoice->unlock();
+        $invoice->allowModifications();
 
         return back();
     }

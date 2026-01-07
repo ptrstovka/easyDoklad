@@ -89,7 +89,7 @@ class InvoiceSerializer
                 'signature' => $invoice->signature ? $this->image($invoice->signature) : null,
                 'pay_by_square' => $invoice->show_pay_by_square && ($pay = $invoice->getPayBySquare()) ? $this->payBySquare($pay) : null,
 
-                'total_to_pay' => ($toPay = $invoice->getAmountToPay()) ? $this->money($toPay, $options->moneyFormattingLocale) : null,
+                'total_to_pay' => ($toPay = $invoice->total_to_pay) ? $this->money($toPay, $options->moneyFormattingLocale) : null,
             ],
         ];
 

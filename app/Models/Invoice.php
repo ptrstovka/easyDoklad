@@ -21,8 +21,6 @@ use Bysqr\Pay;
 use Bysqr\Payment as PendingPayment;
 use Bysqr\PaymentOption;
 use Carbon\Carbon;
-use Closure;
-use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -30,7 +28,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -68,6 +65,8 @@ use RuntimeException;
  * @property int $invoice_number
  * @property Money|null $total_vat_inclusive
  * @property Money|null $total_vat_exclusive
+ * @property Money|null $total_to_pay
+ * @property Money|null $remaining_to_pay
  * @property \Illuminate\Database\Eloquent\Collection<int, \App\Models\Payment> $payments
  */
 class Invoice extends Model
@@ -92,6 +91,8 @@ class Invoice extends Model
             'vat_enabled' => 'boolean',
             'total_vat_inclusive' => AsMoney::class,
             'total_vat_exclusive' => AsMoney::class,
+            'total_to_pay' => AsMoney::class,
+            'remaining_to_pay' => AsMoney::class,
         ];
     }
 
@@ -168,12 +169,29 @@ class Invoice extends Model
      */
     public function calculateTotals(): void
     {
-        $sum = fn (Collection $prices) => Money::total(Money::zero($this->currency), ...$prices->filter()->values());
+        $sum = fn (Collection $prices) => MoneyUtils::sum($this->currency, ...$prices->filter()->values());
 
         $this->total_vat_inclusive = $sum($this->lines->map->total_price_vat_inclusive);
         $this->total_vat_exclusive = $sum($this->lines->map->total_price_vat_exclusive);
+        $this->total_to_pay = $this->calculateTotalToPay();
+        $this->remaining_to_pay = $this->calculateRemainingToPay();
+
+        $recentlyPaid = false;
+
+        if ($this->remaining_to_pay) {
+            if ($this->remaining_to_pay->isZero() && !$this->paid) {
+                $this->paid = true;
+                $recentlyPaid = true;
+            } else if (!$this->remaining_to_pay->isZero() && $this->paid) {
+                $this->paid = false;
+            }
+        }
 
         $this->save();
+
+        if ($recentlyPaid) {
+            event(new InvoicePaid($this->withoutRelations()));
+        }
     }
 
     /**
@@ -225,7 +243,7 @@ class Invoice extends Model
     /**
      * Add edit lock on the invoice.
      */
-    public function lock(): void
+    public function preventModifications(): void
     {
         if ($this->draft) {
             throw new RuntimeException("The invoice draft cannot be locked");
@@ -238,7 +256,7 @@ class Invoice extends Model
     /**
      * Remove edit lock from the invoice.
      */
-    public function unlock(): void
+    public function allowModifications(): void
     {
         $this->locked = false;
         $this->save();
@@ -323,17 +341,13 @@ class Invoice extends Model
      */
     public function isPartiallyPaid(): bool
     {
-        if (($remaining = $this->getRemainingAmountToPay()) && ($toPay = $this->getAmountToPay())) {
-            return $remaining->isPositive() && !$remaining->isEqualTo($toPay);
-        }
-
-        return false;
+        return $this->remaining_to_pay && $this->total_to_pay && !$this->remaining_to_pay->isZero() && !$this->total_to_pay->isEqualTo($this->remaining_to_pay);
     }
 
     /**
-     * Get full amount of the invoice which needs to be paid.
+     * Calculate final amount of the invoice which needs to be paid.
      */
-    public function getAmountToPay(): ?Money
+    protected function calculateTotalToPay(): ?Money
     {
         if (! $this->vat_enabled) {
             return $this->total_vat_exclusive;
@@ -347,11 +361,11 @@ class Invoice extends Model
     }
 
     /**
-     * Get amount which is remaining to be paid.
+     * Calculate amount which is remaining to be paid.
      */
-    public function getRemainingAmountToPay(): ?Money
+    protected function calculateRemainingToPay(): ?Money
     {
-        if ($amount = $this->getAmountToPay()) {
+        if ($amount = $this->calculateTotalToPay()) {
             $paid = MoneyUtils::sum($this->currency, ...$this->payments->map->amount);
 
             return Money::max(Money::zero($this->currency), $amount->minus($paid));
@@ -365,7 +379,7 @@ class Invoice extends Model
      */
     public function getPayBySquare(): ?Pay
     {
-        if (($amount = $this->getAmountToPay()) && ($iban = $this->supplier->bank_account_iban)) {
+        if (($amount = $this->total_to_pay) && ($iban = $this->supplier->bank_account_iban)) {
             return new Pay(
                 payments: [
                     new PendingPayment(
@@ -530,28 +544,8 @@ class Invoice extends Model
 
         $this->load('payments');
 
-        $this->syncPaidState();
+        $this->calculateTotals();
 
         return $payment;
-    }
-
-    /**
-     * Sync the paid state based on added payments.
-     */
-    public function syncPaidState(): void
-    {
-        $paidAmount = MoneyUtils::sum($this->currency, ...$this->payments->map->amount);
-
-        $toPay = $this->getAmountToPay();
-
-        $shouldBePaid = $paidAmount->isGreaterThanOrEqualTo($toPay);
-
-        if ($shouldBePaid && !$this->paid) {
-            $this->update(['paid' => true]);
-
-            event(new InvoicePaid($this->withoutRelations()));
-        } else if (!$shouldBePaid && $this->paid) {
-            $this->update(['paid' => false]);
-        }
     }
 }

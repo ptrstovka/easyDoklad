@@ -13,6 +13,7 @@ use App\Tables\Actions\MarkInvoiceAsSentAction;
 use Brick\Money\Currency;
 use Brick\Money\Money;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use StackTrace\Ui\DateRange;
@@ -60,14 +61,11 @@ class InvoiceTable extends Table
     {
         $builder = $this->source ?: Invoice::query();
 
-        $builder
-            ->with([
-                'account.company',
-                'customer',
-                'payments',
-            ])
-            // ->withSum('payments', 'amount')
-        ;
+        $builder->with([
+            'account.company',
+            'customer',
+            'payments',
+        ]);
 
         return $builder;
     }
@@ -215,18 +213,22 @@ class InvoiceTable extends Table
 
             Filters\Select::make('Úhrada', 'payment', [
                 new SelectOption('Uhradená', 'paid'),
-                // new SelectOption('Čiastočne uhradená', 'partiallyPaid'),
+                new SelectOption('Čiastočne uhradená', 'partiallyPaid'),
                 new SelectOption('Neuhradená', 'unpaid'),
             ])->using(function (Builder $builder, array $selection) {
                 $values = collect($selection)->map->value;
 
                 $builder->where(function (Builder $builder) use ($values) {
                     if ($values->contains('paid')) {
-                        $builder->orWhere('paid', true);
+                        $builder->orWhere(fn (Builder $builder) => $builder->where('paid', true)->where('remaining_to_pay', 0));
                     }
 
                     if ($values->contains('unpaid')) {
-                        $builder->orWhere('paid', false);
+                        $builder->orWhere(fn (Builder $builder) => $builder->where('paid', false)->whereColumn('remaining_to_pay', '=', 'total_to_pay'));
+                    }
+
+                    if ($values->contains('partiallyPaid')) {
+                        $builder->orWhere(fn (Builder $builder) => $builder->where('paid', false)->whereColumn('remaining_to_pay', '!=', 'total_to_pay'));
                     }
                 });
             }),

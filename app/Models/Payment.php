@@ -33,7 +33,7 @@ class Payment extends Model
     {
         static::deleted(function (Payment $payment) {
             if ($payment->payable instanceof Invoice) {
-                $payment->payable->syncPaidState();
+                $payment->payable->calculateTotals();
             }
         });
     }

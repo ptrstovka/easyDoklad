@@ -8,7 +8,6 @@ use App\Http\Controllers\Invoice\DuplicateController;
 use App\Http\Controllers\Invoice\InvoiceController;
 use App\Http\Controllers\Invoice\InvoiceLockController;
 use App\Http\Controllers\Invoice\IssueInvoiceController;
-use App\Http\Controllers\Invoice\PaidFlagController;
 use App\Http\Controllers\Invoice\PaymentController;
 use App\Http\Controllers\Invoice\SendController;
 use App\Http\Controllers\Invoice\SentFlagController;

@@ -14,7 +14,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('account_id')->constrained('accounts');
             $table->morphs('payable');
-            $table->unsignedBigInteger('amount');
+            $table->bigInteger('amount');
             $table->string('currency', 3);
             $table->foreignId('recorded_by_id')->nullable()->constrained('users');
             $table->string('method');
@@ -24,7 +24,7 @@ return new class extends Migration
         });
 
         Invoice::query()->eachById(function (Invoice $invoice) {
-            if ($invoice->paid && ($amount = $invoice->getAmountToPay())) {
+            if ($invoice->paid && ($amount = $invoice->total_to_pay)) {
                 $invoice->payments()->create([
                     'account_id' => $invoice->account()->getParentKey(),
                     'amount' => $amount,

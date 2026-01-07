@@ -30,7 +30,7 @@
           <template v-if="selectedValues.length >0">
             <CommandSeparator />
             <CommandGroup>
-              <CommandItem :value="{ label: 'Clear' }" class="justify-center text-center" @select="onClear">Clear</CommandItem>
+              <CommandItem :value="{ label: 'Clear' }" class="justify-center text-center" @select="onClear">Vymazať</CommandItem>
             </CommandGroup>
           </template>
         </CommandList>
