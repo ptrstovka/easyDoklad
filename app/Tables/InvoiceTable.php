@@ -55,6 +55,14 @@ class InvoiceTable extends Table
         });
 
         $this->perPageOptions([25, 50, 100, 200]);
+
+        $this->mapResource(function (Invoice $invoice) {
+            return [
+                'id' => $invoice->uuid,
+                'remainingToPay' => $invoice->remaining_to_pay?->getMinorAmount(),
+                'paymentMethod' => $invoice->payment_method?->value,
+            ];
+        });
     }
 
     public function source(): Builder
@@ -157,14 +165,14 @@ class InvoiceTable extends Table
     public function actions(): array
     {
         return [
-            Actions\Link::make('Zobraziť', fn (Invoice $invoice) => Link::to(route('invoices.show', $invoice)))
+            Actions\Link::make('Zobraziť', fn (Invoice $invoice) => route('invoices.show', $invoice))
                 ->can(fn (Invoice $invoice) => Gate::allows('view', $invoice)),
 
             MarkInvoiceAsSentAction::make()
                 ->can(fn (Invoice $invoice) => Gate::allows('update', $invoice) && !$invoice->draft && !$invoice->sent),
 
-            // MarkInvoiceAsPaidAction::make()
-            //     ->can(fn (Invoice $invoice) => Gate::allows('update', $invoice) && !$invoice->draft && !$invoice->paid),
+            Actions\Event::make('Pridať úhradu', 'addPayment')
+                ->can(fn (Invoice $invoice) => Gate::allows('update', $invoice) && !$invoice->draft && !$invoice->paid),
 
             DuplicateInvoiceAction::make()
                 ->can(fn (Invoice $invoice) => Gate::allows('view', $invoice) && !$invoice->draft),

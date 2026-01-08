@@ -42,6 +42,7 @@ class InvoiceController
 
         return Inertia::render('Invoices/InvoiceList', [
             'invoices' => $invoices,
+            'paymentMethods' => PaymentMethod::options(),
         ]);
     }
 

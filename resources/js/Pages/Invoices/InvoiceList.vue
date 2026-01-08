@@ -19,12 +19,22 @@
         empty-table-description="Zatiaľ neboli vystavené žiadne faktúry."
         empty-results-message="Žiadne výsledky"
         empty-results-description="Neboli nájdené žiadne vystavené faktúry."
+        @add-payment="addPayment"
       >
         <template #empty-table>
           <Button class="mt-4" :processing="draft.processing" @click="createDraft" size="sm" label="Nová faktúra" :icon="PlusIcon" />
         </template>
       </DataTable>
     </div>
+
+    <AddPaymentDialog
+      v-if="addPaymentToInvoice"
+      :id="addPaymentToInvoice.id"
+      :control="addPaymentToInvoiceDialog"
+      :amount="addPaymentToInvoice.remainingToPay || 0"
+      :payment-methods="paymentMethods"
+      :default-payment-method="addPaymentToInvoice.paymentMethod"
+    />
   </AppLayout>
 </template>
 
@@ -34,12 +44,32 @@ import Heading from "@/Components/Heading.vue";
 import AppLayout from '@/Layouts/AppLayout.vue'
 import { Head, useForm } from "@inertiajs/vue3";
 import { Button } from '@/Components/Button'
+import { type SelectOption, useToggle } from '@stacktrace/ui'
 import { PlusIcon } from 'lucide-vue-next'
+import { nextTick, ref } from 'vue'
+import AddPaymentDialog from './Dialogs/AddPaymentDialog.vue'
 
-defineProps<{
-  invoices: DataTableValue
+interface Invoice {
+  id: string
+  remainingToPay: number | null
+  paymentMethod: string
+}
+
+const props = defineProps<{
+  invoices: DataTableValue<Invoice, number>
+  paymentMethods: Array<SelectOption>
 }>()
 
 const draft = useForm(() => ({}))
 const createDraft = () => draft.post(route('invoices.store'))
+
+const addPaymentToInvoice = ref<Invoice>()
+const addPaymentToInvoiceDialog = useToggle()
+const addPayment = (selection: Array<number>) => {
+  addPaymentToInvoice.value = props.invoices.rows.find(it => selection.includes(it.key))?.resource || undefined
+
+  if (addPaymentToInvoice.value) {
+    nextTick(() =>addPaymentToInvoiceDialog.activate())
+  }
+}
 </script>
