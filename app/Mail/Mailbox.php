@@ -23,8 +23,8 @@ class Mailbox
     {
         $receiver = $email->message()->getHeaderValue(HeaderConsts::TO);
 
-        if (($bankTransactionAccountId = $this->matchesScope('banka', $receiver)) && Str::isUuid($bankTransactionAccountId)) {
-            if ($account = BankTransactionAccount::findByUUID($bankTransactionAccountId)) {
+        if ($bankTransactionAccountHandle = $this->matchesScope('b', $receiver)) {
+            if ($account = BankTransactionAccount::query()->firstWhere('handle', $bankTransactionAccountHandle)) {
                 $this->bankTransactionMailHandler->handle($account, $email);
             }
         }
@@ -35,7 +35,7 @@ class Mailbox
      */
     protected function matchesScope(string $scope, string $email): ?string
     {
-        $identifier = Str::match('/^'.preg_quote($scope).'\+([a-z0-9-]+)@'.preg_quote(config('app.mailbox_domain')).'$/', $email);
+        $identifier = Str::match('/^'.preg_quote($scope).'\+([a-z0-9]{6,12})@'.preg_quote(config('app.mailbox_domain')).'$/', $email);
 
         return $identifier != '' ? $identifier : null;
     }

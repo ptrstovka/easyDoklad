@@ -29,6 +29,7 @@ class BankTransactionAccountController
 
         /** @var BankTransactionAccount $bankAccount */
         $bankAccount = $account->bankTransactionAccounts()->create([
+            'handle' => BankTransactionAccount::randomHandle(),
             'type' => ($bankAccountType = $request->enum('bank_account_type', BankTransactionAccountType::class)),
             'name' => $request->input('bank_account_name'),
             'iban' => $request->input('bank_account_iban'),

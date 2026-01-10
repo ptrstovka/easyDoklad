@@ -4,12 +4,14 @@ namespace App\Models;
 
 use App\Enums\BankTransactionAccountType;
 use App\Models\Concerns\HasUuid;
+use App\Support\UniqueIdentifier;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
+ * @property string $handle
  * @property \App\Models\Account $account
  * @property string $name
  * @property string $iban
@@ -49,6 +51,14 @@ class BankTransactionAccount extends Model
      */
     public function getInboundMail(): string
     {
-        return "banka+{$this->uuid}@".config('app.mailbox_domain');
+        return "b+{$this->handle}@".config('app.mailbox_domain');
+    }
+
+    /**
+     * Generate random handle for a bank transaction account.
+     */
+    public static function randomHandle(): string
+    {
+        return UniqueIdentifier::generate(static::class, column: 'handle', length: 6);
     }
 }
